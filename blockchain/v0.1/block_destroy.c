@@ -1,10 +1,10 @@
 #include "blockchain.h"
 
 /**
- * block_destroy - Frees a block and its allocated memory
- * @block: Pointer to the block to be destroyed
+ * block_destroy - deletes an existing Block
+ *
+ * @block: pointer to the Block to delete
  */
-
 void block_destroy(block_t *block)
 {
 	free(block);

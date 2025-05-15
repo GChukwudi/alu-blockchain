@@ -1,17 +1,23 @@
-#ifndef _BLOCKCHAIN_H_
-#define _BLOCKCHAIN_H_
-#include "../../crypto/hblk_crypto.h"
-#include "provided/_endianness.h"
-#include <stdlib.h>
+#ifndef BLOCKCHAIN_H
+#define BLOCKCHAIN_H
+
+#include <llist.h>
 #include <stdio.h>
 #include <string.h>
-#include <llist/llist.h>
+#include <stdlib.h>
+
 #include <stdint.h>
+#include <sys/types.h>
+
 #include <openssl/sha.h>
-#include <unistd.h>
-#include <sys/syscall.h>
+#include "../../crypto/hblk_crypto.h"
+#include "provided/endianness.h"
+
+#include <time.h>
 
 #define BLOCKCHAIN_DATA_MAX 1024
+#define HBLK_MAGIC "HBLK"
+#define HBLK_VERSION "0.1"
 
 /**
  * struct blockchain_s - Blockchain structure
@@ -20,24 +26,8 @@
  */
 typedef struct blockchain_s
 {
-	llist_t     *chain;
+	llist_t *chain;
 } blockchain_t;
-
-/**
- * struct block_data_s - Block data
- *
- * @buffer: Data buffer
- * @len:    Data size (in bytes)
- */
-typedef struct block_data_s
-{
-	/*
-	 * @buffer must stay first, so we can directly use the structure as
-	 * an array of char
-	 */
-	int8_t      buffer[BLOCKCHAIN_DATA_MAX];
-	uint32_t    len;
-} block_data_t;
 
 /**
  * struct block_info_s - Block info structure
@@ -57,12 +47,28 @@ typedef struct block_info_s
 	 * Therefore, it is possible to use the structure as an array of char,
 	 * on any architecture.
 	 */
-	uint32_t    index;
-	uint32_t    difficulty;
-	uint64_t    timestamp;
-	uint64_t    nonce;
-	uint8_t     prev_hash[SHA256_DIGEST_LENGTH];
+	uint32_t index;
+	uint32_t difficulty;
+	uint64_t timestamp;
+	uint64_t nonce;
+	uint8_t prev_hash[SHA256_DIGEST_LENGTH];
 } block_info_t;
+
+/**
+ * struct block_data_s - Block data
+ *
+ * @buffer: Data buffer
+ * @len:    Data size (in bytes)
+ */
+typedef struct block_data_s
+{
+	/*
+	 * @buffer must stay first, so we can directly use the structure as
+	 * an array of char
+	 */
+	int8_t buffer[BLOCKCHAIN_DATA_MAX];
+	uint32_t len;
+} block_data_t;
 
 /**
  * struct block_s - Block structure
@@ -73,27 +79,43 @@ typedef struct block_info_s
  */
 typedef struct block_s
 {
-	block_info_t    info; /* This must stay first */
-	block_data_t    data; /* This must stay second */
-	uint8_t     hash[SHA256_DIGEST_LENGTH];
+	block_info_t info; /* This must stay first */
+	block_data_t data; /* This must stay second */
+	uint8_t hash[SHA256_DIGEST_LENGTH];
 } block_t;
 
-typedef struct header_s
+/**
+ * struct hblk_file_s - Block file format
+ * @hblk_magic: magic bytes for HBLK
+ * @hblk_version: blockchain version
+ * @hblk_endian: endianness, 1 if big endian, 2 if little endian
+ * @hblk_blocks: number of blocks in the file
+ */
+typedef struct hblk_file_s
 {
-	uint32_t magic;
-	uint8_t version[3];
-	uint8_t endian;
-	uint32_t blocks;
-} header_t;
+	int8_t hblk_magic[4];
+	int8_t hblk_version[3];
+	int8_t hblk_endian;
+	int32_t hblk_blocks;
+} hblk_file_t;
 
 blockchain_t *blockchain_create(void);
 block_t *block_create(block_t const *prev,
-						int8_t const *data, uint32_t data_len);
+
+		      int8_t const *data, uint32_t data_len);
+
 void block_destroy(block_t *block);
 void blockchain_destroy(blockchain_t *blockchain);
-uint8_t *block_hash(block_t const *block, uint8_t hash_buf[SHA256_DIGEST_LENGTH]);
+uint8_t *block_hash(block_t const *block,
+
+		    uint8_t hash_buf[SHA256_DIGEST_LENGTH]);
 int blockchain_serialize(blockchain_t const *blockchain, char const *path);
+
 blockchain_t *blockchain_deserialize(char const *path);
+
 int block_is_valid(block_t const *block, block_t const *prev_block);
 
-#endif
+void _blockchain_destroy(blockchain_t *blockchain);
+void _blockchain_print(blockchain_t const *blockchain);
+
+#endif /* BLOCKCHAIN_H */

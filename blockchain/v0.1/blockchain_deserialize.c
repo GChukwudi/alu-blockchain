@@ -1,58 +1,89 @@
 #include "blockchain.h"
+#include <fcntl.h>
+#include <unistd.h>
+
+#define CLEAN_UP (free(chain), close(fd))
+#define CLEAN_UP_BLOCKS (free(block), llist_destroy(list, 1, NULL))
+#define CHECK_ENDIAN(x) (endianness ? SWAPENDIAN(x) : (void)0)
+
+llist_t *deserialize_blocks(int fd, uint32_t size, uint8_t endianness);
 
 /**
- * write_blocks - Deserialize blocks from a file and add them to a blockchain
- * @size: Number of blocks to deserialize
- * @fd: File descriptor of the file containing serialized blocks
- * @chain: Pointer to the blockchain where blocks will be added
- *
- * Return: Pointer to the updated blockchain
+ * blockchain_deserialize - deserializes blockchain from file
+ * @path: path to serialized blockchain file
+ * Return: pointer to deserialized blockchain or null
  */
-
-blockchain_t *write_blocks(uint32_t size, FILE *fd, blockchain_t *chain)
+blockchain_t *blockchain_deserialize(char const *path)
 {
-	block_t *block;
-	uint32_t i;
+	int fd;
+	blockchain_t *chain = NULL;
+	uint8_t endianness;
+	char buf[4096] = {0};
+	uint32_t size;
 
-	for (i = 0; i < size; i++)
-	{
-		block = calloc(1, sizeof(block_t));
-		fread(&block->info, sizeof(block_info_t), 1, fd);
-		fread(&(block->data.len), sizeof(uint8_t), 4, fd);
-		fread(block->data.buffer, sizeof(uint8_t), block->data.len, fd);
-		fread(block->hash, sizeof(uint8_t), SHA256_DIGEST_LENGTH, fd);
-		llist_add_node(chain->chain, block, ADD_NODE_REAR);
-	}
-
-	return (chain);
-
+	if (!path)
+		return (NULL);
+	fd = open(path, O_RDONLY);
+	if (fd == -1)
+		return (NULL);
+	if (read(fd, buf, strlen(HBLK_MAGIC)) != strlen(HBLK_MAGIC) ||
+	    strcmp(buf, HBLK_MAGIC))
+		return (CLEAN_UP, NULL);
+	buf[strlen(HBLK_VERSION)] = 0;
+	if (read(fd, buf, strlen(HBLK_VERSION)) != strlen(HBLK_VERSION) ||
+	    strcmp(buf, HBLK_VERSION))
+		return (CLEAN_UP, NULL);
+	chain = calloc(1, sizeof(*chain));
+	if (!chain)
+		return (CLEAN_UP, NULL);
+	if (read(fd, &endianness, 1) != 1)
+		return (CLEAN_UP, NULL);
+	endianness = endianness != _get_endianness();
+	if (read(fd, &size, 4) != 4)
+		return (CLEAN_UP, NULL);
+	CHECK_ENDIAN(size);
+	chain->chain = deserialize_blocks(fd, size, endianness);
+	if (!chain)
+		return (CLEAN_UP, NULL);
+	return (close(fd), chain);
 }
 
 /**
- * blockchain_deserialize - Deserialize a blockchain from a file
- * @path: Path to the file containing serialized blockchain data
- *
- * Return: Pointer to the deserialized blockchain
+ * deserialize_blocks - deserializes all the blocks in the file
+ * @fd: open fd to save file
+ * @size: number of blocks in the file
+ * @endianness: if endianess needs switching
+ * Return: pointer to list of blocks or NULL
  */
-
-blockchain_t *blockchain_deserialize(char const *path)
+llist_t *deserialize_blocks(int fd, uint32_t size, uint8_t endianness)
 {
-	FILE *fd = fopen(path, "r");
-	char buf[4] = {0};
-	uint8_t end;
-	uint32_t size;
-	blockchain_t *blockchain = calloc(1, sizeof(blockchain_t));
+	block_t *block;
+	llist_t *list = llist_create(MT_SUPPORT_TRUE);
+	uint32_t i = 0;
 
-
-	if (!fd)
+	if (!list)
 		return (NULL);
-	fread(buf, sizeof(uint8_t), 4, fd);
-	fread(buf, sizeof(uint8_t), 3, fd);
-	fread(&end, sizeof(uint8_t), 1, fd);
-	fread(&size, sizeof(uint32_t), 1, fd);
-	blockchain->chain = llist_create(MT_SUPPORT_FALSE);
-	blockchain = write_blocks(size, fd, blockchain);
-	fclose(fd);
-
-	return (blockchain);
+	for (i = 0; i < size; i++)
+	{
+		block = calloc(1, sizeof(*block));
+		if (!block)
+			return (CLEAN_UP_BLOCKS, NULL);
+		if (read(fd, &(block->info), sizeof(block->info)) != sizeof(block->info))
+			return (CLEAN_UP_BLOCKS, NULL);
+		CHECK_ENDIAN(block->info.index);
+		CHECK_ENDIAN(block->info.difficulty);
+		CHECK_ENDIAN(block->info.timestamp);
+		CHECK_ENDIAN(block->info.nonce);
+		if (read(fd, &(block->data.len), 4) != 4)
+			return (CLEAN_UP_BLOCKS, NULL);
+		CHECK_ENDIAN(block->data.len);
+		if (read(fd, block->data.buffer, block->data.len) != block->data.len)
+			return (CLEAN_UP_BLOCKS, NULL);
+		if (read(fd, block->hash, SHA256_DIGEST_LENGTH) !=
+		    SHA256_DIGEST_LENGTH)
+			return (CLEAN_UP_BLOCKS, NULL);
+		if (llist_add_node(list, block, ADD_NODE_REAR))
+			return (CLEAN_UP_BLOCKS, NULL);
+	}
+	return (list);
 }

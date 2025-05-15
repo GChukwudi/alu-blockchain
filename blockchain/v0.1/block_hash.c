@@ -1,22 +1,19 @@
 #include "blockchain.h"
 
 /**
- * block_hash - Computes the hash of a block using SHA-256 algorithm
- * @block: Pointer to the block to be hashed
- * @hash_buf: Buffer to store the resulting hash
+ * block_hash - computes the hash of a Block
  *
- * Return: Pointer to the computed hash buffer
+ * @block: pointer to the Block to be hashed
+ * @hash_buf: buffer to store the hash
+ *
+ * Return: pointer to the hash_buf
  */
-
 uint8_t *block_hash(block_t const *block,
-					uint8_t hash_buf[SHA256_DIGEST_LENGTH])
+
+		    uint8_t hash_buf[SHA256_DIGEST_LENGTH])
 {
-	SHA256_CTX c;
+	/*hash will contain a digest of both the Block info and data*/
+	size_t len = sizeof(block->info) + block->data.len;
 
-	SHA256_Init(&c);
-	SHA256_Update(&c, (uint8_t const *)&(block->info), sizeof(block->info));
-	SHA256_Update(&c, (uint8_t const *)&(block->data), (block->data.len));
-
-	SHA256_Final(hash_buf, &c);
-	return (hash_buf);
+	return (sha256((int8_t const *)block, len, hash_buf));
 }
