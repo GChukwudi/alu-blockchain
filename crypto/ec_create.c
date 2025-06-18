@@ -3,14 +3,24 @@
 /**
  * ec_create - Creates a new EC key pair
  *
- * Return: Pointer to the newly created EC_KEY structure, or NULL on failure
+ * Return: Pointer to EC_KEY structure containing private and public key
+ *         NULL on failure
  */
-
 EC_KEY *ec_create(void)
 {
-	EC_KEY *my_ec_key;
+	EC_KEY *key;
 
-	my_ec_key = EC_KEY_new_by_curve_name(714);
-	EC_KEY_generate_key(my_ec_key);
-	return (my_ec_key);
+	key = EC_KEY_new_by_curve_name(NID_secp256k1);
+	if (!key)
+	{
+		return (NULL);
+	}
+
+	if (!EC_KEY_generate_key(key))
+	{
+		EC_KEY_free(key);
+		return (NULL);
+	}
+
+	return (key);
 }

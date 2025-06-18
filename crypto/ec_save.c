@@ -1,38 +1,44 @@
 #include "hblk_crypto.h"
 
 /**
- * ec_save - Save EC key pair to files in the specified folder.
- * @key: The EC key pair to be saved.
- * @folder: The folder in which to save the key pair files.
- *
- * Return: 1 on success, 0 on failure.
+ * ec_save - saves public/private keys in PEM format
+ * @key: pointer to EC_KEY struct with key pair
+ * @folder: the folder to save, created if need be
+ * Return: 1 on success else 0
  */
-
 int ec_save(EC_KEY *key, char const *folder)
 {
-	FILE *fdpub, *fdpri;
-	struct stat st = {0};
+	FILE *fp;
+	char path[256] = {0};
 
-	char *pubpath = calloc(strlen(folder) + strlen(PUB_FILENAME) + 1, 1);
-	char *pripath = calloc(strlen(folder) + strlen(PRI_FILENAME) + 1, 1);
+	if (!key || !folder)
+		return (0);
 
-	sprintf(pubpath, "%s/%s", folder, PUB_FILENAME);
-	sprintf(pripath, "%s/%s", folder, PRI_FILENAME);
+	mkdir(folder, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
-	if (stat(folder, &st) != 0)
-		mkdir(folder, 0777);
+	sprintf(path, "%s/" PRI_FILENAME, folder);
+	fp = fopen(path, "w");
+	if (!fp)
+		return (0);
 
-	fdpub = fopen(pubpath, "w");
-	fdpri = fopen(pripath, "w");
+	if (!PEM_write_ECPrivateKey(fp, key, NULL, NULL, 0, NULL, NULL))
+	{
+		fclose(fp);
+		return (0);
+	}
+	fclose(fp);
 
-	PEM_write_EC_PUBKEY(fdpub, key);
-	PEM_write_ECPrivateKey(fdpri, key, NULL, NULL, 0, NULL, NULL);
+	sprintf(path, "%s/" PUB_FILENAME, folder);
+	fp = fopen(path, "w");
+	if (!fp)
+		return (0);
 
-	fclose(fdpub);
-	fclose(fdpri);
-
-	free(pubpath);
-	free(pripath);
+	if (!PEM_write_EC_PUBKEY(fp, key))
+	{
+		fclose(fp);
+		return (0);
+	}
+	fclose(fp);
 
 	return (1);
 }

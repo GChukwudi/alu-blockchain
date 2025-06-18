@@ -1,30 +1,49 @@
 #include "hblk_crypto.h"
 
 /**
- * ec_load - Load an EC key pair from the filesystem
- * @folder: Path to the folder in which the key files are stored
- *
- * Return: Pointer to the loaded EC_KEY structure, or NULL on failure
+ * ec_load - loads an EC key pair from the disk.
+ * @folder: path to the folder in which to save the keys
+ * Return: return a pointer to the created EC key pair
+ * upon success, or NULL upon failure
  */
-
 EC_KEY *ec_load(char const *folder)
 {
-	FILE *fdpub, *fdpri;
-	EC_KEY *key = EC_KEY_new_by_curve_name(NID_secp256k1);
-	char *pubpath = calloc(strlen(folder) + strlen(PUB_FILENAME) + 1, 1);
-	char *pripath = calloc(strlen(folder) + strlen(PRI_FILENAME) + 1, 1);
+	FILE *fp;
+	char path[256] = {0};
+	EC_KEY *key = NULL;
 
-	sprintf(pubpath, "%s/%s", folder, PUB_FILENAME);
-	sprintf(pripath, "%s/%s", folder, PRI_FILENAME);
+	if (!folder)
+		return (0);
 
-	fdpub = fopen(pubpath, "r");
-	fdpri = fopen(pripath, "r");
-
-	PEM_read_EC_PUBKEY(fdpub, &key, NULL, NULL);
-	PEM_read_ECPrivateKey(fdpri, &key, NULL, NULL);
-
-	fclose(fdpub);
-	fclose(fdpri);
-
+	/*Create the complete path to read the public key*/
+	sprintf(path, "%s/" PUB_FILENAME, folder);
+	/*Open a file descriptor to read the public key*/
+	fp = fopen(path, "r");
+	if (!fp)
+	{
+		EC_KEY_free(key);
+		return (0);
+	}
+	/*Read the public key in the given file and store it in key*/
+	if (!PEM_read_EC_PUBKEY(fp, &key, NULL, NULL))
+	{
+		EC_KEY_free(key);
+		fclose(fp);
+		return (0);
+	}
+	fclose(fp);
+	/*Create the complete path to read the private key*/
+	sprintf(path, "%s/" PRI_FILENAME, folder);
+	/*Open a file descriptor to read the private key*/
+	fp = fopen(path, "r");
+	if (!fp)
+		return (0);
+	/*read the private key in the given file and store it in key*/
+	if (!PEM_read_ECPrivateKey(fp, &key, NULL, NULL))
+	{
+		fclose(fp);
+		return (0);
+	}
+	fclose(fp);
 	return (key);
 }

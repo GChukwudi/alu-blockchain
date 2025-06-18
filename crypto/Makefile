@@ -1,25 +1,16 @@
-CC=gcc
-CFLAGS=-Wall -Werror -Wextra -pedantic -Wno-deprecated-declarations -I.
-AR=ar
-ARFLAGS=rcs
-RM=rm -f
+CC = gcc
+CFLAGS = -Wall -Werror -Wextra -pedantic -std=gnu90 -ggdb3 -c
+OBJDIR = targets/
 
-# Automatically find all .c files in the current directory, excluding the test folder
-SRC=$(filter-out test/%, $(wildcard *.c))
+SRC0 = sha256.c ec_create.c ec_to_pub.c ec_from_pub.c ec_save.c ec_load.c ec_sign.c ec_verify.c
+OBJ0 = $(addprefix $(OBJDIR), $(SRC0:%.c=%.o))
+NAME0 = libhblk_crypto.a
 
-# Corresponding object files
-OBJ=$(SRC:.c=.o)
+libhblk_crypto.a: hblk_crypto.h $(OBJDIR) $(OBJ0)
+	ar rcs $(NAME0) $(OBJ0)
 
-# Name of the library
-LIB=libhblk_crypto.a
+$(OBJDIR)%.o: %.c
+	gcc $(CFLAGS) -c $< -o $@
 
-$(LIB): $(OBJ)
-	$(AR) $(ARFLAGS) $(LIB) $(OBJ)
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-clean:
-	$(RM) $(OBJ) $(LIB)
-
-.PHONY: clean
+$(OBJDIR):
+	mkdir $(OBJDIR)
